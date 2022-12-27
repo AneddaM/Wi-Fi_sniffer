@@ -1,0 +1,56 @@
+import pyshark
+import time
+from datetime import datetime
+from pymongo import MongoClient
+import json
+import os
+import hashlib
+
+def get_monitormode():
+    os.system("sudo ifconfig wlan1 down")
+    os.system("sudo iwconfig wlan1 mode monitor")
+    os.system("sudo ifconfig wlan1 up")
+    print("wlan1 in modalità monitor \n")
+get_monitormode()
+
+client = MongoClient('mongodb://user:password@public_IP:DB_port')
+db = client.SNIFFER_DATASET
+collection = db.SNIFFER1
+
+
+def sniffer():
+    scan_PR = pyshark.LiveCapture(interface = 'wlan1', bpf_filter = 'type mgt subtype probe-req')
+    print("Capture start")
+    scan_PR.sniff(timeout = 600)
+    print("End of capture")
+    list = []
+    scan_PR.close()
+
+    print("Start .json creation")
+    for capture in range (0, (len(scan_PR)-1), 1):
+        mac_solved = scan_PR[capture].wlan.sa_resolved
+        encoded = mac_solved.encode()
+        mac_anonymized = hashlib.sha512(encoded)
+        time_obj = datetime.fromisoformat(str(scan_PR[capture].sniff_time))
+        isotime = time_obj.strftime("%Y-%m-%d %H:%M:%S")
+        list_prov={"ANTENNA": 1,
+                    "MAC_ADDRESS": mac_anonymized.hexdigest(),
+                    "FLAG": bin(int(mac_solved[:2],16))[2:].zfill(8)[6:],
+                    "TIMESTAMP": scan_PR[capture].sniff_timestamp,
+                    "DATA_ISO": isotime,
+                    "SEQ": scan_PR[capture].wlan.seq,
+                    "FREQUENCY": scan_PR[capture].wlan_radio.frequency,
+                    "POWER_dBm": scan_PR[capture].wlan_radio.signal_dbm,
+                    "CHANNEL":scan_PR[capture].wlan_radio.channel}
+        list.append(list_prov)
+        
+    with open("/home/pi/Sniffer_1/Capture_Sniffer_1/Capture" + str(time.ctime()) + ".json", "w+") as outfile:
+        json.dump(list, outfile)
+    print("End .json creation")
+    print("Start dB sending")
+    collection.insert_many(list)
+    print("End dB sending")
+    
+while True:
+    sniffer()
+    break
