@@ -8,9 +8,9 @@ import hashlib
 
 def get_monitormode():
     os.system("sudo ifconfig wlan1 down")
-    os.system("sudo iwconfig wlan1 mode monitor")
+    os.system("sudo iwconfig wlan1 monitor mode")
     os.system("sudo ifconfig wlan1 up")
-    print("wlan1 in modalità monitor \n")
+    print("wlan1 in monitor mode \n")
 get_monitormode()
 
 client = MongoClient('mongodb://user:password@public_IP:DB_port')
